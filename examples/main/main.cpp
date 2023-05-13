@@ -527,9 +527,9 @@ int main(int argc, char ** argv) {
             }
 
             if (n_past > 0 && is_interacting) {
-                if (params.instruct) {
-                    printf("\n> ");
-                }
+                // if (params.instruct) {
+                //     printf("\n> ");
+                // }
 
                 std::string buffer;
                 if (!params.input_prefix.empty()) {
@@ -537,42 +537,144 @@ int main(int argc, char ** argv) {
                     printf("%s", buffer.c_str());
                 }
 
-                std::string line;
-                bool another_line = true;
-                do {
-                    another_line = console_readline(con_st, line);
-                    buffer += line;
-                } while (another_line);
 
-                // done taking input, reset color
-                console_set_color(con_st, CONSOLE_COLOR_DEFAULT);
+        puts("RSTsr");
+        printf("n_inps>  ");
+        int num_inputs;
+        std::cin >> num_inputs;
+        getchar();
 
-                // Add tokens to embd only if the input buffer is non-empty
-                // Entering a empty line lets the user pass control back
-                if (buffer.length() > 1) {
-                    // append input suffix if any
-                    if (!params.input_suffix.empty()) {
-                        buffer += params.input_suffix;
-                        printf("%s", params.input_suffix.c_str());
-                    }
+        // Prompt the user to input the number of threads
+        printf("n_threads> ");
+        int num_threads;
+        std::cin >> num_threads;
+        params.n_threads = num_threads;
+        getchar();
+        // Prompt the user to input top_k
+        printf("top_k> ");
+        float top_k;
+        std::cin >> top_k;
+        params.top_k = top_k;
+        getchar();
+        // Prompt the user to input top_p
+        printf("top_p> ");
+        float top_p;
+        std::cin >> top_p;
+        params.top_p = top_p;
+        getchar();
+        // Prompt the user to input temperature
+        printf("temperature> ");
+        float temp;
+        std::cin >> temp;
+        params.temp = temp;
+        getchar();
+        // Prompt the user to input repeat_penalty
+        printf("repeat_penalty> ");
+        float repeat_penalty;
+        std::cin >> repeat_penalty;
+        params.repeat_penalty = repeat_penalty;
+        getchar();
+        // Prompt the user to input batch size
+        printf("n_batch> ");
+        float n_batch;
+        std::cin >> n_batch;
+        params.n_batch = n_batch;
+        getchar();
 
-                    // instruct mode: insert instruction prefix
-                    if (params.instruct && !is_antiprompt) {
-                        n_consumed = embd_inp.size();
-                        embd_inp.insert(embd_inp.end(), inp_pfx.begin(), inp_pfx.end());
-                    }
+        // Prompt the user for antiprompt input
+        std::vector<std::string> antiprompt;
+        printf("antiprompt> ");
+        std::string antip_input;
+        std::getline(std::cin, antip_input);
+        antiprompt.push_back(antip_input);
+        params.antiprompt = antiprompt;
 
-                    auto line_inp = ::llama_tokenize(ctx, buffer, false);
-                    embd_inp.insert(embd_inp.end(), line_inp.begin(), line_inp.end());
+                // std::string line;
+                // bool another_line = true;
+                // do {
+                //     another_line = console_readline(con_st, line);
+                //     buffer += line;
+                // } while (another_line);
 
-                    // instruct mode: insert response suffix
-                    if (params.instruct) {
-                        embd_inp.insert(embd_inp.end(), inp_sfx.begin(), inp_sfx.end());
-                    }
 
-                    n_remain -= line_inp.size();
-                }
+        for (int i = 0; i < num_inputs; ++i) {
+          std::string prompt = "inp( #" + std::to_string(i + 1) + ") : ";
 
+          printf("\n");
+          ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+          printf("\n%s ", prompt.c_str());
+
+          bool another_line = true;
+          std::string input_buffer;
+          bool bos = true; // default value
+          while (another_line) {
+            fflush(stdout);
+            char buf[10002] = {0};
+            int n_read;
+            if (scanf("%10000[^\n]%n%*c", buf, &n_read) <= 0) {
+              if (scanf("%*c") <= 0) { /*ignore*/
+              }
+              n_read = 0;
+            }
+
+            std::string line(buf);
+            if (line.find("@end@") != std::string::npos) {
+              line = line.substr(0, line.find("@end@"));
+              input_buffer += line;
+              bos = true;
+              another_line = false;
+            } else if (line.find("@done@") != std::string::npos) {
+              line = line.substr(0, line.find("@done@"));
+              input_buffer += line;
+              bos = false;
+              another_line = false;
+            } else {
+              input_buffer += line + "\n";
+            }
+            if (another_line) {
+              printf("%s ", prompt.c_str());
+            }
+          }
+
+          auto input_tokens = ::llama_tokenize(ctx, input_buffer, bos);
+
+          embd_inp.insert(embd_inp.end(), input_tokens.begin(),
+                          input_tokens.end());
+
+          n_remain -= input_tokens.size();
+        }
+
+
+
+                // // done taking input, reset color
+                // console_set_color(con_st, CONSOLE_COLOR_DEFAULT);
+                //
+                // // Add tokens to embd only if the input buffer is non-empty
+                // // Entering a empty line lets the user pass control back
+                // if (buffer.length() > 1) {
+                //     // append input suffix if any
+                //     if (!params.input_suffix.empty()) {
+                //         buffer += params.input_suffix;
+                //         printf("%s", params.input_suffix.c_str());
+                //     }
+                //
+                //     // instruct mode: insert instruction prefix
+                //     if (params.instruct && !is_antiprompt) {
+                //         n_consumed = embd_inp.size();
+                //         embd_inp.insert(embd_inp.end(), inp_pfx.begin(), inp_pfx.end());
+                //     }
+                //
+                //     auto line_inp = ::llama_tokenize(ctx, buffer, false);
+                //     embd_inp.insert(embd_inp.end(), line_inp.begin(), line_inp.end());
+                //
+                //     // instruct mode: insert response suffix
+                //     if (params.instruct) {
+                //         embd_inp.insert(embd_inp.end(), inp_sfx.begin(), inp_sfx.end());
+                //     }
+                //
+                //     n_remain -= line_inp.size();
+                // }
+                //
                 input_echo = false; // do not echo this again
             }
 
