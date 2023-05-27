@@ -115,12 +115,16 @@ ifndef LLAMA_NO_ACCELERATE
 	endif
 endif
 ifdef LLAMA_OPENBLAS
-	CFLAGS  += -DGGML_USE_OPENBLAS -I/usr/local/include/openblas
+	CFLAGS  += -DGGML_USE_OPENBLAS -I/usr/local/include/openblas -I/usr/include/openblas
 	ifneq ($(shell grep -e "Arch Linux" -e "ID_LIKE=arch" /etc/os-release 2>/dev/null),)
 		LDFLAGS += -lopenblas -lcblas
 	else
 		LDFLAGS += -lopenblas
 	endif
+endif
+ifdef LLAMA_BLIS
+	CFLAGS += -DGGML_USE_OPENBLAS -I/usr/local/include/blis -I/usr/include/blis
+	LDFLAGS += -lblis -L/usr/local/lib
 endif
 ifdef LLAMA_CUBLAS
 	CFLAGS    += -DGGML_USE_CUBLAS -I/usr/local/cuda/include -I/opt/cuda/include -I$(CUDA_PATH)/targets/x86_64-linux/include
@@ -129,11 +133,22 @@ ifdef LLAMA_CUBLAS
 	OBJS      += ggml-cuda.o
 	NVCC      = nvcc
 	NVCCFLAGS = --forward-unknown-to-host-compiler -arch=native
+ifdef LLAMA_CUDA_DMMV_X
+	NVCCFLAGS += -DGGML_CUDA_DMMV_X=$(LLAMA_CUDA_DMMV_X)
+else
+	NVCCFLAGS += -DGGML_CUDA_DMMV_X=32
+endif # LLAMA_CUDA_DMMV_X
+ifdef LLAMA_CUDA_DMMV_Y
+	NVCCFLAGS += -DGGML_CUDA_DMMV_Y=$(LLAMA_CUDA_DMMV_Y)
+else
+	NVCCFLAGS += -DGGML_CUDA_DMMV_Y=1
+endif # LLAMA_CUDA_DMMV_Y
 ggml-cuda.o: ggml-cuda.cu ggml-cuda.h
 	$(NVCC) $(NVCCFLAGS) $(CXXFLAGS) -Wno-pedantic -c $< -o $@
-endif
+endif # LLAMA_CUBLAS
 ifdef LLAMA_CLBLAST
 	CFLAGS  += -DGGML_USE_CLBLAST
+	CXXFLAGS  += -DGGML_USE_CLBLAST
 	# Mac provides OpenCL as a framework
 	ifeq ($(UNAME_S),Darwin)
 		LDFLAGS += -lclblast -framework OpenCL
@@ -141,8 +156,8 @@ ifdef LLAMA_CLBLAST
 		LDFLAGS += -lclblast -lOpenCL
 	endif
 	OBJS    += ggml-opencl.o
-ggml-opencl.o: ggml-opencl.c ggml-opencl.h
-	$(CC) $(CFLAGS) -c $< -o $@
+ggml-opencl.o: ggml-opencl.cpp ggml-opencl.h
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 endif
 ifneq ($(filter aarch64%,$(UNAME_M)),)
 	# Apple M1, M2, etc.
@@ -241,6 +256,6 @@ benchmark-matmult: examples/benchmark/benchmark-matmult.cpp build-info.h ggml.o 
 vdot: pocs/vdot/vdot.cpp ggml.o $(OBJS)
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
-.PHONY: tests
+.PHONY: tests clean
 tests:
 	bash ./tests/run-tests.sh
